@@ -66,7 +66,16 @@ struct Vec(T, size_t Len)
 
     auto opUnary(string Op)() inout
     {
-        mixin("return "~Op~"data;");
+        static if(UseVec)
+        {
+            mixin("VecT tmp = "~Op~" data;");
+        }
+        else
+        {
+            mixin("VecT tmp = "~Op~" data[];");
+        }
+        Vec ret = tmp[];
+        return ret;
     }
 
     auto opSlice() inout

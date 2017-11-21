@@ -121,6 +121,52 @@ struct ConstOp(T)
     mixin Operators;
 }
 
+struct UnaryOp(PrevOp, string Op)
+{
+    PrevOp prev;
+
+    alias staticLen = PrevOp.staticLen;
+    static if(staticLen)
+    {
+        enum length = PrevOp.length;
+    }
+    else
+    {
+        auto length() const { return prev.length; }
+    }
+
+    static string codegenDecl(ref int i, string src)
+    {
+        const str = prev.codegenDecl(i, src);
+        i++;
+        return str;
+    }
+    static string codegenDef(ref int i, string src, string len)
+    {
+        const str = prev.codegenDef(i, src, len);
+        const prv = i++;
+        return str ~ format("auto val%s = %sval%s;\n", i, Op, prv);
+    }
+    template GetIndex(size_t I)
+    {
+        enum GetIndex = PrevOp.GetIndex!I + 1;
+    }
+    auto ref access(size_t I, size_t Counter)()
+    {
+        enum Ind = GetIndex!I;
+        static if(Ind == Counter)
+        {
+            return data;
+        }
+        else
+        {
+            return prev.access!(I,Counter);
+        }
+    }
+
+    mixin Operators;
+}
+
 struct BinaryOp(PrevOp1, PrevOp2, string Op)
 {
     PrevOp1 prev1;
@@ -233,12 +279,17 @@ mixin template Operators()
 {
     enum SimdOpDefined = true;
 
-    auto opBinary(string Op, T)(T val) if(is(typeof(T.SimdOpDefined)))
+    auto opUnary(string Op)() inout
+    {
+        return UnaryOp!(Unqual!(typeof(this)), Op)(this);
+    }
+
+    auto opBinary(string Op, T)(T val) inout if(is(typeof(T.SimdOpDefined)))
     {
         return BinaryOp!(Unqual!(typeof(this)), T, Op)(this, val);
     }
 
-    auto opBinary(string Op, T)(T val) if(isNumeric!T)
+    auto opBinary(string Op, T)(T val) inout if(isNumeric!T)
     {
         auto op = ConstOp!(T)(val);
         return BinaryOp!(Unqual!(typeof(this)), typeof(op), Op)(this, op);
@@ -450,6 +501,21 @@ unittest
         }
         assert(result == dst);
     }
+    void testUnary(size_t VecSize, L1, L2)()
+    {
+        const int[] src = [1,2,3,4,5];
+        int[] dst = [0,0,0,0,0];
+        int[] result = [-1,-2,-3,-4,-5];
+        static if (0 == VecSize)
+        {
+            store!L1(dst) = -load!L2(src);
+        }
+        else
+        {
+            (store!L1(dst) = -load!L2(src)).apply!VecSize;
+        }
+        assert(result == dst);
+    }
     void testBinary1(size_t VecSize, L1, L2)()
     {
         const int[] src = [1,2,3,4,5];
@@ -493,6 +559,7 @@ unittest
         testFill!(VecSize, L1, L2)(5);
         testFill!(VecSize, L1, L2)(5.0f);
         testFill!(VecSize, L1, L2)(5.0);
+        testUnary!(VecSize, L1, L2);
         testBinary1!(VecSize, L1, L2);
         testBinary2!(VecSize, L1, L2);
     }
