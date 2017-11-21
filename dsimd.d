@@ -428,7 +428,7 @@ struct Computation(Op)
         {
             if (VecSize == Settings.VecSizes[I])
             {
-                enum str = codegen!(I, Op, Settings.VecSizes[I], "")();
+                enum str = codegen!(Settings.VecSizes[I], Op, Settings.VecSizes[I], "")();
                 static if(Settings.Dump)
                 {
                     pragma(msg, str);
