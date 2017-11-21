@@ -41,6 +41,11 @@ auto fill(T)(T val)
     return ConstOp!T(val);
 }
 
+auto gather(T, Op)(T[] data, Op indices)
+{
+    return GarherOp!(Op, T)(indices, data);
+}
+
 private:
 template CheckLenT(T)
 {
@@ -254,6 +259,53 @@ struct StoreOp(PrevOp, LenT, T)
         const str = prev.codegenDef(i, src, len);
         const prv = i++;
         return str ~ format("auto val%s = val%s;\ndata%s[%s..%s + %s] = val%s[];\n", i, prv, i, src, src, len, i);
+    }
+    template GetIndex(size_t I)
+    {
+        enum GetIndex = PrevOp.GetIndex!I + 1;
+    }
+    auto ref access(size_t I, size_t Counter)()
+    {
+        enum Ind = GetIndex!I;
+        static if(Ind == Counter)
+        {
+            return data;
+        }
+        else
+        {
+            return prev.access!(I,Counter);
+        }
+    }
+
+    mixin Operators;
+}
+
+struct GarherOp(PrevOp, T)
+{
+    PrevOp prev;
+    const T[] data;
+
+    enum staticLen = PrevOp.staticLen;
+    static if(staticLen)
+    {
+        enum length = PrevOp.length;
+    }
+    else
+    {
+        auto length() const { return prev.length; }
+    }
+
+    static string codegenDecl(ref int i, string src)
+    {
+        const str = prev.codegenDecl(i, src);
+        i++;
+        return str ~ format("const data%s = getValue!(%s)(%s);\n", i, i, src);
+    }
+    static string codegenDef(ref int i, string src, string len)
+    {
+        const str = prev.codegenDef(i, src, len);
+        const prv = i++;
+        return str ~ format("auto val%s = vec_gather(data%s[], val%s);\n", i, i, prv);
     }
     template GetIndex(size_t I)
     {
@@ -551,6 +603,22 @@ unittest
         }
         assert(result == dst);
     }
+    void testGather(size_t VecSize, L1, L2)()
+    {
+        const int[] src = [1,2,3,4,5];
+        const float[] data = [0,5,4,3,2,1];
+        float[] dst = [0,0,0,0,0];
+        float[] result = [5,4,3,2,1];
+        static if (0 == VecSize)
+        {
+            store!L1(dst) = gather(data, load!L2(src));
+        }
+        else
+        {
+            (store!L1(dst) = gather(data, load!L2(src))).apply!VecSize;
+        }
+        assert(result == dst);
+    }
 
     void test(size_t VecSize, L1, L2)()
     {
@@ -562,6 +630,7 @@ unittest
         testUnary!(VecSize, L1, L2);
         testBinary1!(VecSize, L1, L2);
         testBinary2!(VecSize, L1, L2);
+        testGather!(VecSize, L1, L2);
     }
     test!(0,Dynamic,Dynamic)();
     test!(0,Static!5,Dynamic)();

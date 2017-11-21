@@ -82,4 +82,27 @@ struct Vec(T, size_t Len)
     {
         return data[];
     }
+
+    auto ref opIndex(size_t i) inout
+    {
+        assert(i < data.length);
+        return data[i];
+    }
+}
+
+auto vec_gather(T, V)(in T[] data, in V indices)
+{
+    debug
+    {
+        foreach(ind; indices[])
+        {
+            assert(ind >= 0 && ind < data.length);
+        }
+    }
+    Vec!(T, V.length) ret = void;
+    foreach(i, ind; indices[])
+    {
+        ret[i] = data[ind];
+    }
+    return ret;
 }
