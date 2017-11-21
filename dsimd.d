@@ -1,5 +1,7 @@
 module dsimd;
 
+pure:
+
 struct Dynamic;
 struct Static(size_t L)
 {
@@ -56,6 +58,8 @@ import std.traits;
 import std.algorithm;
 import std.typetuple;
 
+import dsimd_helper;
+
 struct LoadOp(LenT, T)
 {
     T[] data;
@@ -76,7 +80,7 @@ struct LoadOp(LenT, T)
     }
     static string codegenDef(ref int i, string src, string len)
     {
-        return format("const %s[%s] val%s = data%s[%s..%s + %s];\n", T.stringof, len, i, i, src, src, len);
+        return format("Vec!(Unqual!(%s),%s) val%s = data%s[%s..%s + %s];\n", T.stringof, len, i, i, src, src, len);
     }
     template GetIndex(size_t I)
     {
@@ -103,7 +107,7 @@ struct ConstOp(T)
     }
     static string codegenDef(ref int i, string src, string len)
     {
-        return format("const %s[%s] val%s = const%s;\n", T.stringof, len, i, i);
+        return format("Vec!(Unqual!(%s),%s) val%s = const%s;\n", T.stringof, len, i, i);
     }
     template GetIndex(size_t I)
     {
@@ -146,7 +150,7 @@ struct BinaryOp(PrevOp1, PrevOp2, string Op)
         const prv1 = i++;
         const str2 = prev2.codegenDef(i, src, len);
         const prv2 = i++;
-        return str1 ~ str2 ~ format("const typeof(val%s[0] %s val%s[0])[%s] val%s = val%s[] %s val%s[];\n", prv1, Op, prv2, len, i, prv1, Op, prv2);
+        return str1 ~ str2 ~ format("auto val%s = val%s %s val%s;\n", i, prv1, Op, prv2);
     }
     template GetIndex(size_t I)
     {
@@ -203,7 +207,7 @@ struct StoreOp(PrevOp, LenT, T)
     {
         const str = prev.codegenDef(i, src, len);
         const prv = i++;
-        return str ~ format("const val%s = val%s;\ndata%s[%s..%s + %s] = val%s;\n", i, prv, i, src, src, len, i);
+        return str ~ format("auto val%s = val%s;\ndata%s[%s..%s + %s] = val%s[];\n", i, prv, i, src, src, len, i);
     }
     template GetIndex(size_t I)
     {
@@ -376,10 +380,7 @@ struct Computation(Op)
                 enum str = codegen!(I, Op, Settings.VecSizes[I], "")();
                 static if(Settings.Dump)
                 {
-                    import std.stdio;
-                    writeln("===========");
-                    writeln(str);
-                    writeln("===========");
+                    pragma(msg, str);
                 }
                 mixin(str);
                 return;
