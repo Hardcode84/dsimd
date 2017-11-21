@@ -258,7 +258,7 @@ string codegenDef(Op, string src, string len)()
     return Op.codegenDef(i, src, len);
 }
 
-string codegen(Op, size_t len)()
+string codegenFunc(Op, size_t len)()
 {
     const decl = codegenDecl!(Op, "op");
     static if (Op.staticLen)
@@ -305,6 +305,19 @@ foreach (i; len..len + rem)
 }
         `.format(len, len, str1, str2);
     }
+}
+
+string codegen(size_t I, Op, size_t Len, string Attr)()
+{
+    return `
+{
+pragma(inline, true) void func%s(ref Op op) %s
+{
+%s
+}
+func%s(op);
+}
+    `.format(I, Attr, codegenFunc!(Op, Len), I);
 }
 
 struct StoreProxy(LenT, T)
@@ -360,7 +373,7 @@ struct Computation(Op)
         {
             if (VecSize == Settings.VecSizes[I])
             {
-                enum str = codegen!(Op, Settings.VecSizes[I])();
+                enum str = codegen!(I, Op, Settings.VecSizes[I], "")();
                 static if(Settings.Dump)
                 {
                     import std.stdio;
