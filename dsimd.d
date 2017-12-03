@@ -305,7 +305,7 @@ struct GarherOp(PrevOp, T)
     {
         const str = prev.codegenDef(i, src, len);
         const prv = i++;
-        return str ~ format("auto val%s = vec_gather(data%s[], val%s);\n", i, i, prv);
+        return str ~ format("auto val%s = dsimd_helper.gather(data%s[], val%s);\n", i, i, prv);
     }
     template GetIndex(size_t I)
     {
