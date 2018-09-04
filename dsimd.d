@@ -331,17 +331,17 @@ mixin template Operators()
 {
     enum SimdOpDefined = true;
 
-    auto opUnary(string Op)() inout
+    auto opUnary(string Op)()
     {
         return UnaryOp!(Unqual!(typeof(this)), Op)(this);
     }
 
-    auto opBinary(string Op, T)(T val) inout if(is(typeof(T.SimdOpDefined)))
+    auto opBinary(string Op, T)(T val) if(is(typeof(T.SimdOpDefined)))
     {
         return BinaryOp!(Unqual!(typeof(this)), T, Op)(this, val);
     }
 
-    auto opBinary(string Op, T)(T val) inout if(isNumeric!T)
+    auto opBinary(string Op, T)(T val) if(isNumeric!T)
     {
         auto op = ConstOp!(T)(val);
         return BinaryOp!(Unqual!(typeof(this)), typeof(op), Op)(this, op);

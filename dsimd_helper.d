@@ -86,7 +86,16 @@ nothrow:
 
     auto opSlice() inout
     {
-        return data[];
+        static if(UseVec)
+        {
+            T[Len] ret = void;
+            storeUnaligned!VecT(data, ret.ptr);
+            return ret;
+        }
+        else
+        {
+            return data[];
+        }
     }
 
     auto ref opIndex(size_t i) inout
